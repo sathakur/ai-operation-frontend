@@ -8,9 +8,10 @@ import { loadAuthConfig } from "./authConfig.js";
 import "./styles.css";
 
 async function startApplication() {
-  const root = ReactDOM.createRoot(
-    document.getElementById("root")
-  );
+  const root =
+    ReactDOM.createRoot(
+      document.getElementById("root")
+    );
 
   try {
     const {
@@ -19,7 +20,9 @@ async function startApplication() {
       runtimeConfig
     } = await loadAuthConfig();
 
-    const msalInstance = new PublicClientApplication(msalConfig);
+    const msalInstance =
+      new PublicClientApplication(msalConfig);
+
     await msalInstance.initialize();
 
     root.render(
@@ -38,8 +41,7 @@ async function startApplication() {
     root.render(
       <div className="startup-error">
         <h2>Application configuration error</h2>
-        <p>The AI Operations Assistant could not start.</p>
-        <p>{error?.message || "Please contact the application administrator."}</p>
+        <p>{error?.message}</p>
       </div>
     );
   }

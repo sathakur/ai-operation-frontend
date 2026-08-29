@@ -5,16 +5,9 @@ export async function loadAuthConfig() {
   });
 
   if (!response.ok) {
-    let detail = "";
-    try {
-      const body = await response.json();
-      detail = body?.error ? ` - ${body.error}` : "";
-    } catch {
-      // Ignore parsing errors.
-    }
-
+    const body = await response.text();
     throw new Error(
-      `Unable to load application configuration. HTTP ${response.status}${detail}`
+      `Unable to load application configuration. HTTP ${response.status}. ${body}`
     );
   }
 
@@ -23,15 +16,19 @@ export async function loadAuthConfig() {
   if (
     !config.frontendClientId ||
     !config.tenantId ||
-    !config.apiClientId
+    !config.apiClientId ||
+    !config.backendBaseUrl
   ) {
-    throw new Error("Invalid authentication configuration received.");
+    throw new Error(
+      "Invalid application configuration received."
+    );
   }
 
   const msalConfig = {
     auth: {
       clientId: config.frontendClientId,
-      authority: `https://login.microsoftonline.com/${config.tenantId}`,
+      authority:
+        `https://login.microsoftonline.com/${config.tenantId}`,
       redirectUri: window.location.origin,
       postLogoutRedirectUri: window.location.origin
     },

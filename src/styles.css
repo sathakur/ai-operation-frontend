@@ -31,14 +31,12 @@ body {
 }
 
 .content {
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 60px 30px;
+  padding: 50px 30px;
 }
 
-.login-card,
-.welcome-card,
-.action-card {
+.card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -50,6 +48,12 @@ body {
 .login-card {
   max-width: 550px;
   margin: 60px auto;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .primary-button,
@@ -73,7 +77,6 @@ body {
 
 .status {
   margin-top: 18px;
-  font-size: 14px;
 }
 
 .success {
@@ -81,9 +84,18 @@ body {
   font-weight: 600;
 }
 
+.result {
+  margin-top: 20px;
+  padding: 16px;
+  overflow: auto;
+  background: #111827;
+  color: #f9fafb;
+  border-radius: 8px;
+  max-height: 450px;
+}
+
 .startup-error {
   margin: 100px auto;
   max-width: 700px;
   padding: 30px;
-  font-family: "Segoe UI", Arial, sans-serif;
 }
