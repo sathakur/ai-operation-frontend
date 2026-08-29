@@ -5,8 +5,16 @@ export async function loadAuthConfig() {
   });
 
   if (!response.ok) {
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail = body?.error ? ` - ${body.error}` : "";
+    } catch {
+      // Ignore parsing errors.
+    }
+
     throw new Error(
-      `Unable to load application configuration. HTTP ${response.status}`
+      `Unable to load application configuration. HTTP ${response.status}${detail}`
     );
   }
 

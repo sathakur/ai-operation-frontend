@@ -39,7 +39,7 @@ async function startApplication() {
       <div className="startup-error">
         <h2>Application configuration error</h2>
         <p>The AI Operations Assistant could not start.</p>
-        <p>Please contact the application administrator.</p>
+        <p>{error?.message || "Please contact the application administrator."}</p>
       </div>
     );
   }

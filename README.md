@@ -1,28 +1,33 @@
-# AI Operations Assistant Frontend
+# AI Operations Assistant
 
-React + Vite frontend for Azure Static Web Apps.
+Azure Static Web Apps frontend with a managed Azure Functions config endpoint.
 
-## Azure Static Web App environment variables
-
-Create these values under:
-
-Azure Portal -> Static Web Apps -> swa-ai-operation-frontend -> Environment variables
-
-- AZURE_FRONTEND_CLIENT_ID
-- AZURE_TENANT_ID
-- AZURE_API_CLIENT_ID
-
-Do not place the backend client secret in this application.
-
-## Build configuration
+## Static Web Apps build settings
 
 - App location: /
 - API location: api
 - Output location: dist
 
-## Entra redirect URI
+## Azure Static Web App environment variables
 
-Register the exact Static Web App origin as a Single-page application redirect URI.
+Configure these in Azure Portal:
 
-Example:
-https://<your-static-web-app>.azurestaticapps.net
+- AZURE_FRONTEND_CLIENT_ID
+- AZURE_TENANT_ID
+- AZURE_API_CLIENT_ID
+
+Do not put the backend client secret in this Static Web App.
+
+## Test endpoint
+
+After deployment:
+
+/api/config
+
+Expected response when variables are configured:
+
+{
+  "frontendClientId": "...",
+  "tenantId": "...",
+  "apiClientId": "..."
+}

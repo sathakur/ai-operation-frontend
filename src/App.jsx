@@ -35,10 +35,13 @@ function App({ loginRequest }) {
   };
 
   const testApiToken = async () => {
-    if (!account) return;
+    if (!account) {
+      setStatus("No signed-in account was found.");
+      return;
+    }
 
     try {
-      setStatus("Requesting API access token...");
+      setStatus("Requesting Inventory.Read access token...");
 
       const tokenResponse = await instance.acquireTokenSilent({
         ...loginRequest,
@@ -60,7 +63,7 @@ function App({ loginRequest }) {
         });
       } catch (redirectError) {
         console.error(redirectError);
-        setStatus("Unable to acquire API access token.");
+        setStatus("Unable to acquire Inventory.Read access token.");
       }
     }
   };
