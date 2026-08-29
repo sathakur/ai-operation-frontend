@@ -1,0 +1,89 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f5f7fa;
+  color: #1f2937;
+}
+
+.page {
+  min-height: 100vh;
+}
+
+.header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 22px 40px;
+}
+
+.header h1 {
+  margin: 5px 0 0;
+  font-size: 26px;
+}
+
+.small-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+.content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 60px 30px;
+}
+
+.login-card,
+.welcome-card,
+.action-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 30px;
+  margin-bottom: 20px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+}
+
+.login-card {
+  max-width: 550px;
+  margin: 60px auto;
+}
+
+.primary-button,
+.secondary-button {
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.primary-button {
+  background: #2563eb;
+  color: white;
+  border: none;
+}
+
+.secondary-button {
+  background: white;
+  border: 1px solid #9ca3af;
+}
+
+.status {
+  margin-top: 18px;
+  font-size: 14px;
+}
+
+.success {
+  color: #166534;
+  font-weight: 600;
+}
+
+.startup-error {
+  margin: 100px auto;
+  max-width: 600px;
+  padding: 30px;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
