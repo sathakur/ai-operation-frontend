@@ -181,129 +181,6 @@ const renderAssistantText = (text) => {
 
   return blocks;
 };
-const renderStructuredPresentation = (presentation) => {
-  if (!presentation) {
-    return null;
-  }
-
-  const responseType =
-    String(presentation.responseType || "").toLowerCase();
-
-  const title = presentation.title || "";
-  const summary = presentation.summary || "";
-
-  const columns = Array.isArray(presentation.columns)
-    ? presentation.columns
-    : [];
-
-  const rows = Array.isArray(presentation.rows)
-    ? presentation.rows
-    : [];
-
-  if (responseType === "metric") {
-    return (
-      <div className="structured-response">
-        {title && (
-          <div className="structured-title">
-            {title}
-          </div>
-        )}
-
-        <div className="structured-metric">
-          {presentation.total ?? 0}
-        </div>
-
-        {summary && (
-          <div className="structured-summary">
-            {summary}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (responseType === "table") {
-    return (
-      <div className="structured-response">
-        <div className="structured-header">
-          <div>
-            {title && (
-              <div className="structured-title">
-                {title}
-              </div>
-            )}
-
-            {summary && (
-              <div className="structured-summary">
-                {summary}
-              </div>
-            )}
-          </div>
-
-          <div className="structured-count">
-            {presentation.total ?? rows.length}
-          </div>
-        </div>
-
-        {rows.length === 0 ? (
-          <div className="structured-empty">
-            No results found.
-          </div>
-        ) : (
-          <div className="structured-table-wrapper">
-            <table className="structured-table">
-              <thead>
-                <tr>
-                  {columns.map((column) => (
-                    <th key={`head-${column}`}>
-                      {column}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {rows.map((row, rowIndex) => (
-                  <tr key={`row-${rowIndex}`}>
-                    {columns.map((column) => {
-                      const matchingKey =
-                        Object.keys(row || {}).find(
-                          (key) =>
-                            key.toLowerCase() ===
-                            String(column).toLowerCase()
-                        );
-
-                      const value =
-                        row?.[column] ??
-                        (matchingKey
-                          ? row?.[matchingKey]
-                          : undefined);
-
-                      return (
-                        <td
-                          key={`cell-${rowIndex}-${column}`}
-                          data-label={column}
-                        >
-                          {value === null ||
-                          value === undefined ||
-                          value === ""
-                            ? "â€”"
-                            : String(value)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return null;
-};
 function App({ loginRequest, runtimeConfig }) {
   const { instance, accounts } = useMsal();
 
@@ -489,8 +366,6 @@ function App({ loginRequest, runtimeConfig }) {
           text:
             body?.answer ||
             "The assistant returned no text response.",
-          presentation:
-            body?.presentation || null,
           meta: {
             correlationId:
               body?.correlationId || null,
@@ -797,14 +672,8 @@ function App({ loginRequest, runtimeConfig }) {
                         >
                           <div className="message-text">
                             {message.role === "assistant"
-  ? message.presentation
-    ? renderStructuredPresentation(
-        message.presentation
-      )
-    : renderAssistantText(
-        message.text
-      )
-  : message.text}
+                              ? renderAssistantText(message.text)
+                              : message.text}
                           </div>
                         </div>
 
