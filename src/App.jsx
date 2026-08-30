@@ -4,26 +4,93 @@ import {
   useMsal
 } from "@azure/msal-react";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const STARTER_MESSAGE = {
+  id: "assistant-welcome",
+  role: "assistant",
+  text:
+    "Hello! I’m your Azure Operations Assistant. I can help you explore subscriptions, virtual machines, storage accounts, resource groups, subnets, and other Azure inventory.",
+  meta: null
+};
+
+const QUICK_PROMPTS = [
+  {
+    label: "Subscriptions",
+    prompt: "Show me subscription names"
+  },
+  {
+    label: "VM count",
+    prompt: "How many virtual machines are there?"
+  },
+  {
+    label: "Virtual machines",
+    prompt: "Show me VM names"
+  },
+  {
+    label: "Storage accounts",
+    prompt: "Show me storage accounts"
+  },
+  {
+    label: "Resource groups",
+    prompt: "Show me resource groups"
+  },
+  {
+    label: "Resource summary",
+    prompt: "Show me resource summary"
+  }
+];
 
 function App({ loginRequest, runtimeConfig }) {
   const { instance, accounts } = useMsal();
 
-  const [status, setStatus] = useState("");
-  const [apiResult, setApiResult] = useState(null);
-
-  const [chatMessage, setChatMessage] = useState(
-    "Hello. What can you help me with?"
-  );
-  const [chatAnswer, setChatAnswer] = useState("");
-  const [chatMeta, setChatMeta] = useState(null);
-  const [chatLoading, setChatLoading] = useState(false);
-
   const account =
     accounts.length > 0 ? accounts[0] : null;
 
+  const [messages, setMessages] = useState([
+    STARTER_MESSAGE
+  ]);
+
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [technicalMessageId, setTechnicalMessageId] =
+    useState(null);
+
+  const conversationEndRef = useRef(null);
+
+  const displayName =
+    account?.name ||
+    account?.username ||
+    "Signed-in user";
+
+  const initials = useMemo(() => {
+    const source =
+      account?.name ||
+      account?.username ||
+      "AU";
+
+    const parts = source
+      .replace(/[#@._-]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    return (
+      parts
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("") || "AU"
+    );
+  }, [account]);
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end"
+    });
+  }, [messages, chatLoading]);
+
   const login = async () => {
-    setStatus("Redirecting to Microsoft sign-in...");
     await instance.loginRedirect(loginRequest);
   };
 
@@ -60,65 +127,46 @@ function App({ loginRequest, runtimeConfig }) {
   const getBackendBaseUrl = () =>
     runtimeConfig.backendBaseUrl.replace(/\/+$/, "");
 
-  const callBackend = async (path) => {
-    try {
-      setApiResult(null);
-      setStatus(`Calling ${path} ...`);
+  const createId = (prefix) =>
+    `${prefix}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
 
-      const token = await getAccessToken();
-
-      if (!token) {
-        return;
-      }
-
-      const response =
-        await fetch(`${getBackendBaseUrl()}${path}`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-
-      const text = await response.text();
-
-      let body;
-      try {
-        body = JSON.parse(text);
-      } catch {
-        body = text;
-      }
-
-      setApiResult(body);
-
-      if (!response.ok) {
-        setStatus(
-          `Backend returned HTTP ${response.status}`
-        );
-        return;
-      }
-
-      setStatus("Backend call successful.");
-    } catch (error) {
-      console.error(error);
-      setStatus(
-        error?.message || "Backend call failed."
-      );
-    }
+  const newChat = () => {
+    setMessages([STARTER_MESSAGE]);
+    setChatMessage("");
+    setTechnicalMessageId(null);
+    setSidebarOpen(false);
   };
 
-  const sendChatMessage = async () => {
-    const message = chatMessage.trim();
+  const sendChatMessage = async (
+    overrideMessage = null
+  ) => {
+    const message = (
+      overrideMessage ?? chatMessage
+    ).trim();
 
-    if (!message) {
-      setChatAnswer("Enter a message first.");
+    if (!message || chatLoading) {
       return;
     }
 
-    try {
-      setChatLoading(true);
-      setChatAnswer("");
-      setChatMeta(null);
+    const userMessage = {
+      id: createId("user"),
+      role: "user",
+      text: message,
+      meta: null
+    };
 
+    setMessages((current) => [
+      ...current,
+      userMessage
+    ]);
+
+    setChatMessage("");
+    setChatLoading(true);
+    setSidebarOpen(false);
+
+    try {
       const token = await getAccessToken();
 
       if (!token) {
@@ -143,6 +191,7 @@ function App({ loginRequest, runtimeConfig }) {
       const text = await response.text();
 
       let body;
+
       try {
         body = JSON.parse(text);
       } catch {
@@ -159,29 +208,45 @@ function App({ loginRequest, runtimeConfig }) {
           text ||
           `HTTP ${response.status}`;
 
-        throw new Error(
-          `Agent API returned HTTP ${response.status}: ${detail}`
-        );
+        throw new Error(detail);
       }
 
-      setChatAnswer(
-        body?.answer ||
-        "The agent returned no text response."
-      );
-
-      setChatMeta({
-        correlationId: body?.correlationId,
-        user: body?.user,
-        agentName: body?.agentName,
-        agentVersion: body?.agentVersion
-      });
+      setMessages((current) => [
+        ...current,
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text:
+            body?.answer ||
+            "The assistant returned no text response.",
+          meta: {
+            correlationId:
+              body?.correlationId || null,
+            agentName:
+              body?.agentName || null,
+            agentVersion:
+              body?.agentVersion || null
+          }
+        }
+      ]);
     } catch (error) {
       console.error(error);
 
-      setChatAnswer(
-        error?.message ||
-        "Foundry agent call failed."
-      );
+      setMessages((current) => [
+        ...current,
+        {
+          id: createId("assistant-error"),
+          role: "assistant",
+          text:
+            "I couldn’t complete that request. Please try again. If the issue continues, open Technical details and provide the correlation information to the support team.",
+          isError: true,
+          meta: {
+            error:
+              error?.message ||
+              "Azure Operations Assistant request failed."
+          }
+        }
+      ]);
     } finally {
       setChatLoading(false);
     }
@@ -193,215 +258,421 @@ function App({ loginRequest, runtimeConfig }) {
       !event.shiftKey
     ) {
       event.preventDefault();
-
-      if (!chatLoading) {
-        sendChatMessage();
-      }
+      sendChatMessage();
     }
   };
 
+  const copyMessage = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      console.error(
+        "Could not copy response.",
+        error
+      );
+    }
+  };
+
+  const handleQuickPrompt = (prompt) => {
+    setChatMessage(prompt);
+    sendChatMessage(prompt);
+  };
+
   return (
-    <div className="page">
-      <header className="header">
-        <div>
-          <div className="small-title">
-            AZURE OPERATIONS
-          </div>
-          <h1>AI Operations Assistant</h1>
-        </div>
-      </header>
+    <>
+      <UnauthenticatedTemplate>
+        <div className="login-page">
+          <div className="login-shell">
+            <div className="brand-mark large">
+              <span className="brand-mark-inner">
+                AZ
+              </span>
+            </div>
 
-      <main className="content">
-        <UnauthenticatedTemplate>
-          <div className="card login-card">
-            <h2>Azure Inventory Assistant</h2>
+            <div className="login-kicker">
+              AZURE OPERATIONS
+            </div>
 
-            <p>
-              Sign in with your organizational Microsoft
-              account to access Azure inventory.
+            <h1>
+              AI Operations Assistant
+            </h1>
+
+            <p className="login-copy">
+              Securely explore your Azure environment
+              using Microsoft Entra ID and a controlled,
+              read-only AI assistant.
             </p>
 
             <button
-              className="primary-button"
+              className="button button-primary login-button"
               onClick={login}
             >
+              <span className="microsoft-window">
+                <span />
+                <span />
+                <span />
+                <span />
+              </span>
               Sign in with Microsoft
             </button>
 
-            {status && (
-              <p className="status">{status}</p>
-            )}
-          </div>
-        </UnauthenticatedTemplate>
-
-        <AuthenticatedTemplate>
-          <div className="card">
-            <h2>Welcome</h2>
-
-            <p>
-              <strong>Name:</strong>{" "}
-              {account?.name || "Unknown"}
-            </p>
-
-            <p>
-              <strong>User:</strong>{" "}
-              {account?.username || "Unknown"}
-            </p>
-
-            <p className="success">
-              ✓ Microsoft Entra authentication successful
-            </p>
-          </div>
-
-          <div className="card">
-            <h3>Backend tests</h3>
-
-            <div className="button-row">
-              <button
-                className="primary-button"
-                onClick={() =>
-                  callBackend(
-                    "/api/inventory/whoami"
-                  )
-                }
-              >
-                Test Who Am I
-              </button>
-
-              <button
-                className="primary-button"
-                onClick={() =>
-                  callBackend(
-                    "/api/inventory/subscriptions"
-                  )
-                }
-              >
-                List My Subscriptions
-              </button>
-
-              <button
-                className="primary-button"
-                onClick={() =>
-                  callBackend(
-                    "/api/inventory/vms"
-                  )
-                }
-              >
-                List My VMs
-              </button>
+            <div className="login-security">
+              <span className="status-dot" />
+              Enterprise authentication enabled
             </div>
-
-            {status && (
-              <p className="status">{status}</p>
-            )}
-
-            {apiResult !== null && (
-              <pre className="result">
-                {JSON.stringify(
-                  apiResult,
-                  null,
-                  2
-                )}
-              </pre>
-            )}
           </div>
+        </div>
+      </UnauthenticatedTemplate>
 
-          <div className="card">
-            <div className="chat-heading-row">
-              <div>
-                <h3>Foundry Agent Test</h3>
-                <p className="muted">
-                  Tests the authenticated frontend →
-                  Web App → Microsoft Foundry Agent path.
-                </p>
+      <AuthenticatedTemplate>
+        <div className="app-shell">
+          <header className="topbar">
+            <div className="topbar-left">
+              <button
+                className="icon-button mobile-menu-button"
+                onClick={() =>
+                  setSidebarOpen((current) => !current)
+                }
+                aria-label="Toggle navigation"
+              >
+                ☰
+              </button>
+
+              <div className="brand-mark">
+                <span className="brand-mark-inner">
+                  AZ
+                </span>
               </div>
 
-              <span className="read-only-badge">
-                READ ONLY
-              </span>
+              <div className="brand-copy">
+                <div className="brand-kicker">
+                  AZURE OPERATIONS
+                </div>
+                <div className="brand-title">
+                  AI Operations Assistant
+                </div>
+              </div>
             </div>
 
-            <label
-              className="chat-label"
-              htmlFor="agent-message"
-            >
-              Message
-            </label>
+            <div className="topbar-right">
+              <div className="environment-pill">
+                <span className="status-dot" />
+                Connected
+              </div>
 
-            <textarea
-              id="agent-message"
-              className="chat-input"
-              rows="4"
-              value={chatMessage}
-              onChange={(e) =>
-                setChatMessage(e.target.value)
-              }
-              onKeyDown={handleChatKeyDown}
-              placeholder="Ask the Azure Operations Agent..."
-              disabled={chatLoading}
-            />
+              <div className="mode-pill">
+                Read only
+              </div>
 
-            <div className="chat-actions">
-              <button
-                className="primary-button"
-                onClick={sendChatMessage}
-                disabled={chatLoading}
-              >
-                {chatLoading
-                  ? "Calling Foundry..."
-                  : "Send to Foundry Agent"}
-              </button>
-
-              <span className="muted">
-                Enter to send · Shift+Enter for new line
-              </span>
-            </div>
-
-            {chatAnswer && (
-              <div className="agent-response">
-                <div className="agent-response-title">
-                  Agent response
+              <div className="user-menu">
+                <div className="avatar">
+                  {initials}
                 </div>
 
-                <div className="agent-response-text">
-                  {chatAnswer}
-                </div>
-
-                {chatMeta && (
-                  <div className="agent-meta">
-                    {chatMeta.agentName && (
-                      <span>
-                        Agent: {chatMeta.agentName}
-                      </span>
-                    )}
-
-                    {chatMeta.agentVersion && (
-                      <span>
-                        Version: {chatMeta.agentVersion}
-                      </span>
-                    )}
-
-                    {chatMeta.correlationId && (
-                      <span>
-                        Correlation ID:{" "}
-                        {chatMeta.correlationId}
-                      </span>
-                    )}
+                <div className="user-copy">
+                  <div className="user-name">
+                    {displayName}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                  <div className="user-subtitle">
+                    Microsoft Entra ID
+                  </div>
+                </div>
 
-          <button
-            className="secondary-button"
-            onClick={logout}
-          >
-            Sign out
-          </button>
-        </AuthenticatedTemplate>
-      </main>
-    </div>
+                <button
+                  className="signout-button"
+                  onClick={logout}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <div className="workspace">
+            <aside
+              className={`sidebar ${
+                sidebarOpen ? "sidebar-open" : ""
+              }`}
+            >
+              <button
+                className="button button-primary new-chat-button"
+                onClick={newChat}
+              >
+                <span className="plus-icon">＋</span>
+                New chat
+              </button>
+
+              <div className="sidebar-section">
+                <div className="sidebar-label">
+                  QUICK QUESTIONS
+                </div>
+
+                <div className="quick-prompt-list">
+                  {QUICK_PROMPTS.map((item) => (
+                    <button
+                      key={item.label}
+                      className="quick-prompt"
+                      onClick={() =>
+                        handleQuickPrompt(
+                          item.prompt
+                        )
+                      }
+                      disabled={chatLoading}
+                    >
+                      <span className="quick-prompt-icon">
+                        ◇
+                      </span>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="sidebar-spacer" />
+
+              <div className="sidebar-info">
+                <div className="sidebar-info-title">
+                  Secure inventory access
+                </div>
+                <div className="sidebar-info-copy">
+                  Results are retrieved through approved
+                  read-only Azure inventory tools.
+                </div>
+              </div>
+            </aside>
+
+            {sidebarOpen && (
+              <button
+                className="sidebar-overlay"
+                onClick={() =>
+                  setSidebarOpen(false)
+                }
+                aria-label="Close navigation"
+              />
+            )}
+
+            <main className="chat-panel">
+              <section className="chat-header">
+                <div>
+                  <h1>
+                    Azure Operations Assistant
+                  </h1>
+                  <p>
+                    Ask questions about your Azure
+                    subscriptions and resources.
+                  </p>
+                </div>
+
+                <div className="chat-header-status">
+                  <span className="status-dot" />
+                  Inventory service connected
+                </div>
+              </section>
+
+              <section className="conversation">
+                <div className="conversation-inner">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`message-row ${message.role}`}
+                    >
+                      <div
+                        className={`message-avatar ${
+                          message.role
+                        }`}
+                      >
+                        {message.role === "assistant"
+                          ? "AI"
+                          : initials}
+                      </div>
+
+                      <div className="message-content">
+                        <div className="message-heading">
+                          {message.role === "assistant"
+                            ? "Azure Operations Assistant"
+                            : "You"}
+                        </div>
+
+                        <div
+                          className={`message-bubble ${
+                            message.role
+                          } ${
+                            message.isError
+                              ? "message-error"
+                              : ""
+                          }`}
+                        >
+                          <div className="message-text">
+                            {message.text}
+                          </div>
+                        </div>
+
+                        {message.role === "assistant" && (
+                          <div className="message-actions">
+                            <button
+                              onClick={() =>
+                                copyMessage(
+                                  message.text
+                                )
+                              }
+                            >
+                              Copy
+                            </button>
+
+                            {message.meta && (
+                              <button
+                                onClick={() =>
+                                  setTechnicalMessageId(
+                                    technicalMessageId ===
+                                      message.id
+                                      ? null
+                                      : message.id
+                                  )
+                                }
+                              >
+                                Technical details
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {technicalMessageId ===
+                          message.id &&
+                          message.meta && (
+                            <div className="technical-details">
+                              {message.meta.agentName && (
+                                <div>
+                                  <span>Agent</span>
+                                  <strong>
+                                    {
+                                      message.meta
+                                        .agentName
+                                    }
+                                  </strong>
+                                </div>
+                              )}
+
+                              {message.meta
+                                .agentVersion && (
+                                <div>
+                                  <span>Version</span>
+                                  <strong>
+                                    {
+                                      message.meta
+                                        .agentVersion
+                                    }
+                                  </strong>
+                                </div>
+                              )}
+
+                              {message.meta
+                                .correlationId && (
+                                <div>
+                                  <span>
+                                    Correlation ID
+                                  </span>
+                                  <strong>
+                                    {
+                                      message.meta
+                                        .correlationId
+                                    }
+                                  </strong>
+                                </div>
+                              )}
+
+                              {message.meta.error && (
+                                <div>
+                                  <span>Error</span>
+                                  <strong>
+                                    {
+                                      message.meta
+                                        .error
+                                    }
+                                  </strong>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {chatLoading && (
+                    <div className="message-row assistant">
+                      <div className="message-avatar assistant">
+                        AI
+                      </div>
+
+                      <div className="message-content">
+                        <div className="message-heading">
+                          Azure Operations Assistant
+                        </div>
+
+                        <div className="thinking-card">
+                          <div className="thinking-dots">
+                            <span />
+                            <span />
+                            <span />
+                          </div>
+                          Checking Azure inventory…
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={conversationEndRef} />
+                </div>
+              </section>
+
+              <section className="composer-area">
+                <div className="composer-shell">
+                  <textarea
+                    value={chatMessage}
+                    onChange={(event) =>
+                      setChatMessage(
+                        event.target.value
+                      )
+                    }
+                    onKeyDown={handleChatKeyDown}
+                    placeholder="Ask about your Azure environment..."
+                    rows="1"
+                    disabled={chatLoading}
+                    aria-label="Message"
+                  />
+
+                  <button
+                    className="send-button"
+                    onClick={() =>
+                      sendChatMessage()
+                    }
+                    disabled={
+                      chatLoading ||
+                      !chatMessage.trim()
+                    }
+                    aria-label="Send message"
+                  >
+                    ➤
+                  </button>
+                </div>
+
+                <div className="composer-footer">
+                  <span>
+                    Enter to send · Shift+Enter for
+                    new line
+                  </span>
+
+                  <span>
+                    Read-only Azure inventory · AI
+                    responses should be verified for
+                    critical decisions
+                  </span>
+                </div>
+              </section>
+            </main>
+          </div>
+        </div>
+      </AuthenticatedTemplate>
+    </>
   );
 }
 
