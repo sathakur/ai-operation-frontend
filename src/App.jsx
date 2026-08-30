@@ -12,6 +12,13 @@ function App({ loginRequest, runtimeConfig }) {
   const [status, setStatus] = useState("");
   const [apiResult, setApiResult] = useState(null);
 
+  const [chatMessage, setChatMessage] = useState(
+    "Hello. What can you help me with?"
+  );
+  const [chatAnswer, setChatAnswer] = useState("");
+  const [chatMeta, setChatMeta] = useState(null);
+  const [chatLoading, setChatLoading] = useState(false);
+
   const account =
     accounts.length > 0 ? accounts[0] : null;
 
@@ -50,6 +57,9 @@ function App({ loginRequest, runtimeConfig }) {
     }
   };
 
+  const getBackendBaseUrl = () =>
+    runtimeConfig.backendBaseUrl.replace(/\/+$/, "");
+
   const callBackend = async (path) => {
     try {
       setApiResult(null);
@@ -61,11 +71,8 @@ function App({ loginRequest, runtimeConfig }) {
         return;
       }
 
-      const baseUrl =
-        runtimeConfig.backendBaseUrl.replace(/\/+$/, "");
-
       const response =
-        await fetch(`${baseUrl}${path}`, {
+        await fetch(`${getBackendBaseUrl()}${path}`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`
@@ -93,7 +100,103 @@ function App({ loginRequest, runtimeConfig }) {
       setStatus("Backend call successful.");
     } catch (error) {
       console.error(error);
-      setStatus(error?.message || "Backend call failed.");
+      setStatus(
+        error?.message || "Backend call failed."
+      );
+    }
+  };
+
+  const sendChatMessage = async () => {
+    const message = chatMessage.trim();
+
+    if (!message) {
+      setChatAnswer("Enter a message first.");
+      return;
+    }
+
+    try {
+      setChatLoading(true);
+      setChatAnswer("");
+      setChatMeta(null);
+
+      const token = await getAccessToken();
+
+      if (!token) {
+        return;
+      }
+
+      const response =
+        await fetch(
+          `${getBackendBaseUrl()}/api/chat`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              message
+            })
+          }
+        );
+
+      const text = await response.text();
+
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = {
+          answer: text
+        };
+      }
+
+      if (!response.ok) {
+        const detail =
+          body?.detail ||
+          body?.title ||
+          body?.answer ||
+          text ||
+          `HTTP ${response.status}`;
+
+        throw new Error(
+          `Agent API returned HTTP ${response.status}: ${detail}`
+        );
+      }
+
+      setChatAnswer(
+        body?.answer ||
+        "The agent returned no text response."
+      );
+
+      setChatMeta({
+        correlationId: body?.correlationId,
+        user: body?.user,
+        agentName: body?.agentName,
+        agentVersion: body?.agentVersion
+      });
+    } catch (error) {
+      console.error(error);
+
+      setChatAnswer(
+        error?.message ||
+        "Foundry agent call failed."
+      );
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleChatKeyDown = (event) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      if (!chatLoading) {
+        sendChatMessage();
+      }
     }
   };
 
@@ -112,6 +215,7 @@ function App({ loginRequest, runtimeConfig }) {
         <UnauthenticatedTemplate>
           <div className="card login-card">
             <h2>Azure Inventory Assistant</h2>
+
             <p>
               Sign in with your organizational Microsoft
               account to access Azure inventory.
@@ -156,7 +260,9 @@ function App({ loginRequest, runtimeConfig }) {
               <button
                 className="primary-button"
                 onClick={() =>
-                  callBackend("/api/inventory/whoami")
+                  callBackend(
+                    "/api/inventory/whoami"
+                  )
                 }
               >
                 Test Who Am I
@@ -176,7 +282,9 @@ function App({ loginRequest, runtimeConfig }) {
               <button
                 className="primary-button"
                 onClick={() =>
-                  callBackend("/api/inventory/vms")
+                  callBackend(
+                    "/api/inventory/vms"
+                  )
                 }
               >
                 List My VMs
@@ -195,6 +303,93 @@ function App({ loginRequest, runtimeConfig }) {
                   2
                 )}
               </pre>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="chat-heading-row">
+              <div>
+                <h3>Foundry Agent Test</h3>
+                <p className="muted">
+                  Tests the authenticated frontend →
+                  Web App → Microsoft Foundry Agent path.
+                </p>
+              </div>
+
+              <span className="read-only-badge">
+                READ ONLY
+              </span>
+            </div>
+
+            <label
+              className="chat-label"
+              htmlFor="agent-message"
+            >
+              Message
+            </label>
+
+            <textarea
+              id="agent-message"
+              className="chat-input"
+              rows="4"
+              value={chatMessage}
+              onChange={(e) =>
+                setChatMessage(e.target.value)
+              }
+              onKeyDown={handleChatKeyDown}
+              placeholder="Ask the Azure Operations Agent..."
+              disabled={chatLoading}
+            />
+
+            <div className="chat-actions">
+              <button
+                className="primary-button"
+                onClick={sendChatMessage}
+                disabled={chatLoading}
+              >
+                {chatLoading
+                  ? "Calling Foundry..."
+                  : "Send to Foundry Agent"}
+              </button>
+
+              <span className="muted">
+                Enter to send · Shift+Enter for new line
+              </span>
+            </div>
+
+            {chatAnswer && (
+              <div className="agent-response">
+                <div className="agent-response-title">
+                  Agent response
+                </div>
+
+                <div className="agent-response-text">
+                  {chatAnswer}
+                </div>
+
+                {chatMeta && (
+                  <div className="agent-meta">
+                    {chatMeta.agentName && (
+                      <span>
+                        Agent: {chatMeta.agentName}
+                      </span>
+                    )}
+
+                    {chatMeta.agentVersion && (
+                      <span>
+                        Version: {chatMeta.agentVersion}
+                      </span>
+                    )}
+
+                    {chatMeta.correlationId && (
+                      <span>
+                        Correlation ID:{" "}
+                        {chatMeta.correlationId}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
