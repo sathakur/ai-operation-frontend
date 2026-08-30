@@ -209,15 +209,8 @@ const normalizeResourceType = (value) => {
 };
 
 const getDisplayColumns = (columns, records) => {
-  let result = columns.filter(
-    (column) =>
-      !["ID", "Id", "Resource ID"].includes(
-        column
-      )
-  );
-
-  if (!result.includes("Type")) {
-    return result;
+  if (!columns.includes("Type")) {
+    return columns;
   }
 
   const typeValues = [
@@ -225,30 +218,25 @@ const getDisplayColumns = (columns, records) => {
       records
         .map((record) => record.Type)
         .filter(Boolean)
-        .map((value) =>
-          String(value).toLowerCase()
-        )
     )
   ];
 
+  // If every row is the same resource type, the Type column
+  // is redundant and can be hidden for a cleaner table.
   if (typeValues.length === 1) {
-    result = result.filter(
+    return columns.filter(
       (column) => column !== "Type"
     );
   }
 
-  return result;
+  return columns;
 };
+
 const renderCellValue = (column, value) => {
-  let displayValue =
+  const displayValue =
     column === "Type"
       ? normalizeResourceType(value)
-      : String(value || "\u2014");
-
-  if (column === "Location") {
-    displayValue =
-      normalizeLocation(displayValue);
-  }
+      : String(value || "â€”");
 
   const badgeColumns = [
     "Location",
@@ -258,10 +246,7 @@ const renderCellValue = (column, value) => {
 
   if (badgeColumns.includes(column)) {
     return (
-      <span
-        className="assistant-table-badge"
-        title={displayValue}
-      >
+      <span className="assistant-table-badge">
         {displayValue}
       </span>
     );
@@ -276,278 +261,55 @@ const renderCellValue = (column, value) => {
     </span>
   );
 };
-const renderTable = (
-  columns,
-  records,
-  keyPrefix,
-  options = {}
-) => {
+
+const renderTable = (columns, records, keyPrefix) => {
   const displayColumns =
     getDisplayColumns(columns, records);
-
-  const showResultCount =
-    options.showResultCount !== false;
 
   return (
     <div
       className="assistant-table-section"
       key={`${keyPrefix}-section`}
     >
-      {showResultCount && (
-        <div className="assistant-table-toolbar">
-          <div className="assistant-table-count">
-            {records.length}{" "}
-            {records.length === 1
-              ? "result"
-              : "results"}
-          </div>
+      <div className="assistant-table-toolbar">
+        <div className="assistant-table-count">
+          {records.length}{" "}
+          {records.length === 1 ? "result" : "results"}
         </div>
-      )}
+      </div>
 
       <div className="assistant-table-wrap">
         <table className="assistant-table">
           <thead>
             <tr>
-              {displayColumns.map(
-                (column) => (
-                  <th
-                    key={`${keyPrefix}-head-${column}`}
-                  >
-                    {column}
-                  </th>
-                )
-              )}
+              {displayColumns.map((column) => (
+                <th key={`${keyPrefix}-head-${column}`}>
+                  {column}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {records.map(
-              (record, rowIndex) => (
-                <tr
-                  key={`${keyPrefix}-row-${rowIndex}`}
-                >
-                  {displayColumns.map(
-                    (column) => (
-                      <td
-                        key={`${keyPrefix}-${rowIndex}-${column}`}
-                        data-label={column}
-                      >
-                        {renderCellValue(
-                          column,
-                          record[column]
-                        )}
-                      </td>
-                    )
-                  )}
-                </tr>
-              )
-            )}
+            {records.map((record, rowIndex) => (
+              <tr key={`${keyPrefix}-row-${rowIndex}`}>
+                {displayColumns.map((column) => (
+                  <td
+                    key={`${keyPrefix}-${rowIndex}-${column}`}
+                    data-label={column}
+                  >
+                    {renderCellValue(
+                      column,
+                      record[column]
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
     </div>
   );
-};
-const parsePlainRecordTable = (lines) => {
-  const allowedFields = new Set([
-    "Name",
-    "Type",
-    "Location",
-    "Subscription",
-    "Subscription Name",
-    "Resource Group",
-    "ID",
-    "Id"
-  ]);
-
-  const records = [];
-  let current = null;
-  let firstIndex = -1;
-  let lastIndex = -1;
-
-  const fieldRegex =
-    /^(?:[-*]\s*)?(?:\*\*)?([^:*]+?)(?:\*\*)?\s*:\s*(.+?)\s*$/;
-
-  lines.forEach((rawLine, index) => {
-    const line = rawLine.trim();
-    const match = line.match(fieldRegex);
-
-    if (!match) {
-      return;
-    }
-
-    const field = match[1].trim();
-    let value = cleanMarkdownValue(match[2]);
-
-    if (!allowedFields.has(field)) {
-      return;
-    }
-
-    value = stripCodeTicks(value);
-
-    if (field === "Location") {
-      value = normalizeLocation(value);
-    }
-
-    if (field === "Name") {
-      if (current?.Name) {
-        records.push(current);
-      }
-
-      current = {};
-
-      if (firstIndex < 0) {
-        firstIndex = index;
-      }
-    }
-
-    if (!current) {
-      return;
-    }
-
-    current[field] = value;
-    lastIndex = index;
-  });
-
-  if (current?.Name) {
-    records.push(current);
-  }
-
-  const uniqueRecords = dedupeRecords(records);
-
-  if (uniqueRecords.length < 2) {
-    return null;
-  }
-
-  const preferredColumns = [
-    "Name",
-    "Type",
-    "Location",
-    "Subscription",
-    "Subscription Name",
-    "Resource Group",
-    "ID"
-  ];
-
-  const columns = preferredColumns.filter(
-    (column) =>
-      uniqueRecords.some((record) =>
-        Object.prototype.hasOwnProperty.call(
-          record,
-          column
-        )
-      )
-  );
-
-  return {
-    records: uniqueRecords,
-    columns,
-    firstRecordIndex: firstIndex,
-    lastRecordIndex: lastIndex
-  };
-};
-
-const parseMarkdownPipeTable = (lines) => {
-  const splitPipeRow = (line) =>
-    line
-      .trim()
-      .replace(/^\|/, "")
-      .replace(/\|$/, "")
-      .split("|")
-      .map((cell) => cleanMarkdownValue(cell));
-
-  const isSeparatorRow = (line) => {
-    const cells = splitPipeRow(line);
-
-    return (
-      cells.length >= 2 &&
-      cells.every((cell) =>
-        /^:?-{3,}:?$/.test(cell)
-      )
-    );
-  };
-
-  for (
-    let index = 0;
-    index < lines.length - 2;
-    index++
-  ) {
-    const headerLine = lines[index]?.trim();
-    const separatorLine =
-      lines[index + 1]?.trim();
-
-    if (
-      !headerLine?.includes("|") ||
-      !separatorLine?.includes("|") ||
-      !isSeparatorRow(separatorLine)
-    ) {
-      continue;
-    }
-
-    const columns = splitPipeRow(headerLine);
-
-    if (columns.length < 2) {
-      continue;
-    }
-
-    const records = [];
-    let lastIndex = index + 1;
-
-    for (
-      let rowIndex = index + 2;
-      rowIndex < lines.length;
-      rowIndex++
-    ) {
-      const rowLine =
-        lines[rowIndex]?.trim();
-
-      if (
-        !rowLine ||
-        !rowLine.includes("|")
-      ) {
-        break;
-      }
-
-      const cells =
-        splitPipeRow(rowLine);
-
-      if (cells.length < 2) {
-        break;
-      }
-
-      const record = {};
-
-      columns.forEach(
-        (column, columnIndex) => {
-          let value =
-            cells[columnIndex] || "";
-
-          if (
-            column.toLowerCase() ===
-            "location"
-          ) {
-            value =
-              normalizeLocation(value);
-          }
-
-          record[column] = value;
-        }
-      );
-
-      records.push(record);
-      lastIndex = rowIndex;
-    }
-
-    if (records.length > 0) {
-      return {
-        columns,
-        records,
-        firstIndex: index,
-        lastIndex
-      };
-    }
-  }
-
-  return null;
 };
 const renderStandardAssistantText = (lines) => {
   const blocks = [];
@@ -666,67 +428,6 @@ const renderAssistantText = (text) => {
     .replace(/\r\n/g, "\n")
     .split("\n");
 
-  const markdownTable =
-    parseMarkdownPipeTable(lines);
-
-  if (markdownTable) {
-    const before = lines.slice(
-      0,
-      markdownTable.firstIndex
-    );
-
-    const after = lines.slice(
-      markdownTable.lastIndex + 1
-    );
-
-    const isSummary =
-      markdownTable.columns.some(
-        (column) =>
-          /resource\s*type/i.test(column)
-      ) &&
-      markdownTable.columns.some(
-        (column) =>
-          /^count$/i.test(column)
-      );
-
-    return [
-      ...renderStandardAssistantText(before),
-      renderTable(
-        markdownTable.columns,
-        markdownTable.records,
-        "assistant-markdown-table",
-        {
-          showResultCount: !isSummary
-        }
-      ),
-      ...renderStandardAssistantText(after)
-    ];
-  }
-
-  const plainRecordTable =
-    parsePlainRecordTable(lines);
-
-  if (plainRecordTable) {
-    const before = lines.slice(
-      0,
-      plainRecordTable.firstRecordIndex
-    );
-
-    const after = lines.slice(
-      plainRecordTable.lastRecordIndex + 1
-    );
-
-    return [
-      ...renderStandardAssistantText(before),
-      renderTable(
-        plainRecordTable.columns,
-        plainRecordTable.records,
-        "assistant-plain-record-table"
-      ),
-      ...renderStandardAssistantText(after)
-    ];
-  }
-
   const recordTable = parseRecordTable(lines);
 
   if (recordTable) {
@@ -793,8 +494,7 @@ const renderAssistantText = (text) => {
       renderTable(
         ["Resource", "Count"],
         summaryRows,
-        "assistant-summary-table",
-        { showResultCount: false }
+        "assistant-summary-table"
       )
     ];
   }

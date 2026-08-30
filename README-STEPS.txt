@@ -1,38 +1,63 @@
-TABLE POLISH V2 - FIXED
-=======================
+FRONTEND FORMATTING V3
+======================
 
-Why the previous script failed:
-It tried to match the entire renderTable function character-for-character.
-Your App.jsx structure is correct, but exact text matching is fragile.
+This patch handles all current response styles.
 
-This fixed script instead locates:
-  const renderTable = ...
-through:
-  const renderStandardAssistantText = ...
+It fixes plain output like:
 
-and replaces only that section.
+Name: devstoragesec
+Type: Microsoft.Storage/storageAccounts
+Location: eastus
+Subscription: SecondarySub
+Resource Group: rg-storagedec
+ID: `/subscriptions/...`
+
+It converts that into the same professional table used by the good
+Storage Accounts view.
+
+It also:
+- deduplicates rows
+- calculates the displayed result count from unique returned records
+- hides the very long ID column
+- hides Type when every row is the same Azure resource type
+- normalizes eastus -> East US, westeurope -> West Europe, etc.
+- supports Markdown pipe tables for Resource Summary
+- does not show a misleading "N results" badge on Resource Summary
 
 RUN
 ---
-Copy/extract Apply-TablePolishV2-Fixed.ps1 into:
+Copy Apply-FrontendFormattingV3.ps1 to:
+
 C:\script\ai-operation-frontend
 
 Then:
 
 cd C:\script\ai-operation-frontend
 
-.\Apply-TablePolishV2-Fixed.ps1
+.\Apply-FrontendFormattingV3.ps1
 
 VERIFY
 ------
 git diff -- src\App.jsx
-git diff -- src\styles.css
+
+BUILD
+-----
 npm run build
 
-Do not commit until npm run build succeeds.
+If build succeeds:
 
-Then:
-
-git add src\App.jsx src\styles.css
-git commit -m "Polish Azure inventory table presentation"
+git add src\App.jsx
+git commit -m "Support all Azure inventory response formats"
 git push
+
+TEST
+----
+Show me storage accounts
+Show me resource summary
+Show me VM names
+Show me resource groups
+
+IMPORTANT
+---------
+The inventory result badge is the number of unique rows actually returned
+in that response. It does not trust or invent a number from assistant prose.
