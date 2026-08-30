@@ -54,133 +54,6 @@ const QUICK_PROMPTS = [
   }
 ];
 
-const renderInlineFormatting = (text, keyPrefix) => {
-  const parts = String(text).split(/(\*\*[^*]+\*\*)/g);
-
-  return parts.map((part, index) => {
-    const key = `${keyPrefix}-inline-${index}`;
-
-    if (
-      part.startsWith("**") &&
-      part.endsWith("**") &&
-      part.length > 4
-    ) {
-      return (
-        <strong key={key}>
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-
-    return <span key={key}>{part}</span>;
-  });
-};
-
-const renderAssistantText = (text) => {
-  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
-  const blocks = [];
-  let listItems = [];
-  let listType = null;
-
-  const flushList = () => {
-    if (listItems.length === 0) {
-      return;
-    }
-
-    const ListTag = listType === "ordered" ? "ol" : "ul";
-    const blockIndex = blocks.length;
-
-    blocks.push(
-      <ListTag
-        key={`assistant-list-${blockIndex}`}
-        className="assistant-list"
-      >
-        {listItems.map((item, index) => (
-          <li key={`assistant-list-${blockIndex}-${index}`}>
-            {renderInlineFormatting(
-              item,
-              `assistant-list-${blockIndex}-${index}`
-            )}
-          </li>
-        ))}
-      </ListTag>
-    );
-
-    listItems = [];
-    listType = null;
-  };
-
-  lines.forEach((rawLine, index) => {
-    const line = rawLine.trim();
-
-    if (!line) {
-      flushList();
-      return;
-    }
-
-    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
-    const numberedMatch = line.match(/^\d+[.)]\s+(.+)$/);
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
-
-    if (bulletMatch) {
-      if (listType && listType !== "unordered") {
-        flushList();
-      }
-
-      listType = "unordered";
-      listItems.push(bulletMatch[1]);
-      return;
-    }
-
-    if (numberedMatch) {
-      if (listType && listType !== "ordered") {
-        flushList();
-      }
-
-      listType = "ordered";
-      listItems.push(numberedMatch[1]);
-      return;
-    }
-
-    flushList();
-
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      const HeadingTag =
-        level === 1 ? "h3" : level === 2 ? "h4" : "h5";
-
-      blocks.push(
-        <HeadingTag
-          key={`assistant-heading-${index}`}
-          className="assistant-heading"
-        >
-          {renderInlineFormatting(
-            headingMatch[2],
-            `assistant-heading-${index}`
-          )}
-        </HeadingTag>
-      );
-
-      return;
-    }
-
-    blocks.push(
-      <p
-        key={`assistant-paragraph-${index}`}
-        className="assistant-paragraph"
-      >
-        {renderInlineFormatting(
-          line,
-          `assistant-paragraph-${index}`
-        )}
-      </p>
-    );
-  });
-
-  flushList();
-
-  return blocks;
-};
 function App({ loginRequest, runtimeConfig }) {
   const { instance, accounts } = useMsal();
 
@@ -671,9 +544,7 @@ function App({ loginRequest, runtimeConfig }) {
                           }`}
                         >
                           <div className="message-text">
-                            {message.role === "assistant"
-                              ? renderAssistantText(message.text)
-                              : message.text}
+                            {message.text}
                           </div>
                         </div>
 
