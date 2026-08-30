@@ -76,8 +76,159 @@ const renderInlineFormatting = (text, keyPrefix) => {
   });
 };
 
-const renderAssistantText = (text) => {
-  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+const cleanMarkdownValue = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s{2,}$/g, "");
+
+const parseRecordTable = (lines) => {
+  const records = [];
+  let current = null;
+  let firstRecordIndex = -1;
+  let lastRecordIndex = -1;
+
+  const numberedField =
+    /^\d+[.)]\s+\*\*([^*]+):\*\*\s*(.+?)\s*$/;
+  const bulletField =
+    /^[-*]\s+\*\*([^*]+):\*\*\s*(.+?)\s*$/;
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    const numberedMatch = line.match(numberedField);
+    const bulletMatch = line.match(bulletField);
+
+    if (numberedMatch) {
+      if (current) {
+        records.push(current);
+      }
+
+      current = {
+        [numberedMatch[1].trim()]:
+          cleanMarkdownValue(numberedMatch[2])
+      };
+
+      if (firstRecordIndex < 0) {
+        firstRecordIndex = index;
+      }
+
+      lastRecordIndex = index;
+      return;
+    }
+
+    if (current && bulletMatch) {
+      current[bulletMatch[1].trim()] =
+        cleanMarkdownValue(bulletMatch[2]);
+      lastRecordIndex = index;
+      return;
+    }
+
+    if (current && line === "") {
+      lastRecordIndex = index;
+    }
+  });
+
+  if (current) {
+    records.push(current);
+  }
+
+  if (records.length < 2) {
+    return null;
+  }
+
+  const columns = [];
+  records.forEach((record) => {
+    Object.keys(record).forEach((key) => {
+      if (!columns.includes(key)) {
+        columns.push(key);
+      }
+    });
+  });
+
+  if (columns.length < 2) {
+    return null;
+  }
+
+  return {
+    records,
+    columns,
+    firstRecordIndex,
+    lastRecordIndex
+  };
+};
+
+const parseSummaryTable = (lines) => {
+  const rows = [];
+  let firstIndex = -1;
+  let lastIndex = -1;
+
+  const summaryField =
+    /^[-*]\s+\*\*([^*]+):\*\*\s*(.+?)\s*$/;
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    const match = line.match(summaryField);
+
+    if (!match) {
+      return;
+    }
+
+    if (firstIndex < 0) {
+      firstIndex = index;
+    }
+
+    lastIndex = index;
+
+    rows.push({
+      label: match[1].trim(),
+      value: cleanMarkdownValue(match[2])
+    });
+  });
+
+  if (rows.length < 4) {
+    return null;
+  }
+
+  return {
+    rows,
+    firstIndex,
+    lastIndex
+  };
+};
+
+const renderTable = (columns, records, keyPrefix) => (
+  <div
+    className="assistant-table-wrap"
+    key={`${keyPrefix}-wrap`}
+  >
+    <table className="assistant-table">
+      <thead>
+        <tr>
+          {columns.map((column) => (
+            <th key={`${keyPrefix}-head-${column}`}>
+              {column}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {records.map((record, rowIndex) => (
+          <tr key={`${keyPrefix}-row-${rowIndex}`}>
+            {columns.map((column) => (
+              <td
+                key={`${keyPrefix}-${rowIndex}-${column}`}
+                data-label={column}
+              >
+                {record[column] || "â€”"}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
+const renderStandardAssistantText = (lines) => {
   const blocks = [];
   let listItems = [];
   let listType = null;
@@ -87,7 +238,8 @@ const renderAssistantText = (text) => {
       return;
     }
 
-    const ListTag = listType === "ordered" ? "ol" : "ul";
+    const ListTag =
+      listType === "ordered" ? "ol" : "ul";
     const blockIndex = blocks.length;
 
     blocks.push(
@@ -96,7 +248,9 @@ const renderAssistantText = (text) => {
         className="assistant-list"
       >
         {listItems.map((item, index) => (
-          <li key={`assistant-list-${blockIndex}-${index}`}>
+          <li
+            key={`assistant-list-${blockIndex}-${index}`}
+          >
             {renderInlineFormatting(
               item,
               `assistant-list-${blockIndex}-${index}`
@@ -119,8 +273,10 @@ const renderAssistantText = (text) => {
     }
 
     const bulletMatch = line.match(/^[-*]\s+(.+)$/);
-    const numberedMatch = line.match(/^\d+[.)]\s+(.+)$/);
-    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    const numberedMatch =
+      line.match(/^\d+[.)]\s+(.+)$/);
+    const headingMatch =
+      line.match(/^(#{1,3})\s+(.+)$/);
 
     if (bulletMatch) {
       if (listType && listType !== "unordered") {
@@ -147,7 +303,11 @@ const renderAssistantText = (text) => {
     if (headingMatch) {
       const level = headingMatch[1].length;
       const HeadingTag =
-        level === 1 ? "h3" : level === 2 ? "h4" : "h5";
+        level === 1
+          ? "h3"
+          : level === 2
+            ? "h4"
+            : "h5";
 
       blocks.push(
         <HeadingTag
@@ -160,7 +320,6 @@ const renderAssistantText = (text) => {
           )}
         </HeadingTag>
       );
-
       return;
     }
 
@@ -178,8 +337,86 @@ const renderAssistantText = (text) => {
   });
 
   flushList();
-
   return blocks;
+};
+
+const renderAssistantText = (text) => {
+  const lines = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n");
+
+  const recordTable = parseRecordTable(lines);
+
+  if (recordTable) {
+    const before = lines.slice(
+      0,
+      recordTable.firstRecordIndex
+    );
+    const after = lines.slice(
+      recordTable.lastRecordIndex + 1
+    );
+
+    return [
+      ...renderStandardAssistantText(before),
+      renderTable(
+        recordTable.columns,
+        recordTable.records,
+        "assistant-record-table"
+      ),
+      ...renderStandardAssistantText(after)
+    ];
+  }
+
+  const nonEmptyLines = lines.filter(
+    (line) => line.trim() !== ""
+  );
+  const summaryTable = parseSummaryTable(
+    nonEmptyLines.filter((line) =>
+      /^[-*]\s+\*\*[^*]+:\*\*/.test(line.trim())
+    )
+  );
+
+  const summaryCandidateCount =
+    nonEmptyLines.filter((line) =>
+      /^[-*]\s+\*\*[^*]+:\*\*/.test(line.trim())
+    ).length;
+
+  if (
+    summaryTable &&
+    summaryCandidateCount >= 4
+  ) {
+    const summaryRows = nonEmptyLines
+      .map((line) =>
+        line
+          .trim()
+          .match(
+            /^[-*]\s+\*\*([^*]+):\*\*\s*(.+?)\s*$/
+          )
+      )
+      .filter(Boolean)
+      .map((match) => ({
+        Resource: match[1].trim(),
+        Count: cleanMarkdownValue(match[2])
+      }));
+
+    const otherLines = lines.filter(
+      (line) =>
+        !/^[-*]\s+\*\*[^*]+:\*\*/.test(
+          line.trim()
+        )
+    );
+
+    return [
+      ...renderStandardAssistantText(otherLines),
+      renderTable(
+        ["Resource", "Count"],
+        summaryRows,
+        "assistant-summary-table"
+      )
+    ];
+  }
+
+  return renderStandardAssistantText(lines);
 };
 function App({ loginRequest, runtimeConfig }) {
   const { instance, accounts } = useMsal();
