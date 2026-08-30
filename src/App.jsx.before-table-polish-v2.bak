@@ -195,122 +195,39 @@ const parseSummaryTable = (lines) => {
   };
 };
 
-const normalizeResourceType = (value) => {
-  const text = String(value || "");
-
-  if (
-    text.toLowerCase() ===
-    "microsoft.storage/storageaccounts"
-  ) {
-    return "Storage account";
-  }
-
-  return text;
-};
-
-const getDisplayColumns = (columns, records) => {
-  if (!columns.includes("Type")) {
-    return columns;
-  }
-
-  const typeValues = [
-    ...new Set(
-      records
-        .map((record) => record.Type)
-        .filter(Boolean)
-    )
-  ];
-
-  // If every row is the same resource type, the Type column
-  // is redundant and can be hidden for a cleaner table.
-  if (typeValues.length === 1) {
-    return columns.filter(
-      (column) => column !== "Type"
-    );
-  }
-
-  return columns;
-};
-
-const renderCellValue = (column, value) => {
-  const displayValue =
-    column === "Type"
-      ? normalizeResourceType(value)
-      : String(value || "â€”");
-
-  const badgeColumns = [
-    "Location",
-    "Subscription",
-    "Subscription Name"
-  ];
-
-  if (badgeColumns.includes(column)) {
-    return (
-      <span className="assistant-table-badge">
-        {displayValue}
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="assistant-table-cell-text"
-      title={displayValue}
-    >
-      {displayValue}
-    </span>
-  );
-};
-
-const renderTable = (columns, records, keyPrefix) => {
-  const displayColumns =
-    getDisplayColumns(columns, records);
-
-  return (
-    <div
-      className="assistant-table-section"
-      key={`${keyPrefix}-section`}
-    >
-      <div className="assistant-table-toolbar">
-        <div className="assistant-table-count">
-          {records.length}{" "}
-          {records.length === 1 ? "result" : "results"}
-        </div>
-      </div>
-
-      <div className="assistant-table-wrap">
-        <table className="assistant-table">
-          <thead>
-            <tr>
-              {displayColumns.map((column) => (
-                <th key={`${keyPrefix}-head-${column}`}>
-                  {column}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {records.map((record, rowIndex) => (
-              <tr key={`${keyPrefix}-row-${rowIndex}`}>
-                {displayColumns.map((column) => (
-                  <td
-                    key={`${keyPrefix}-${rowIndex}-${column}`}
-                    data-label={column}
-                  >
-                    {renderCellValue(
-                      column,
-                      record[column]
-                    )}
-                  </td>
-                ))}
-              </tr>
+const renderTable = (columns, records, keyPrefix) => (
+  <div
+    className="assistant-table-wrap"
+    key={`${keyPrefix}-wrap`}
+  >
+    <table className="assistant-table">
+      <thead>
+        <tr>
+          {columns.map((column) => (
+            <th key={`${keyPrefix}-head-${column}`}>
+              {column}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {records.map((record, rowIndex) => (
+          <tr key={`${keyPrefix}-row-${rowIndex}`}>
+            {columns.map((column) => (
+              <td
+                key={`${keyPrefix}-${rowIndex}-${column}`}
+                data-label={column}
+              >
+                {record[column] || "â€”"}
+              </td>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 const renderStandardAssistantText = (lines) => {
   const blocks = [];
   let listItems = [];
