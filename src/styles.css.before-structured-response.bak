@@ -248,30 +248,3 @@ button,textarea{font:inherit}button{cursor:pointer}button:focus-visible,textarea
     min-width:680px;
   }
 }
-
-/* Structured backend presentation contract */
-.structured-response {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.structured-response-title {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.structured-response-summary {
-  font-size: 13px;
-  line-height: 1.5;
-  opacity: 0.82;
-}
-
-.structured-metric {
-  font-size: 34px;
-  font-weight: 750;
-  line-height: 1;
-  letter-spacing: -0.03em;
-}

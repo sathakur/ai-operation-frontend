@@ -1,63 +1,130 @@
-FRONTEND FORMATTING V3
+STRUCTURED FRONTEND V1
 ======================
 
-This patch handles all current response styles.
+This frontend patch is for the backend structured-response contract
+you already pushed.
 
-It fixes plain output like:
+WHAT IT DOES
+------------
+The frontend now prefers:
 
-Name: devstoragesec
-Type: Microsoft.Storage/storageAccounts
-Location: eastus
-Subscription: SecondarySub
-Resource Group: rg-storagedec
-ID: `/subscriptions/...`
+body.presentation
 
-It converts that into the same professional table used by the good
-Storage Accounts view.
+instead of trying to parse Foundry/GPT formatting.
 
-It also:
-- deduplicates rows
-- calculates the displayed result count from unique returned records
-- hides the very long ID column
-- hides Type when every row is the same Azure resource type
-- normalizes eastus -> East US, westeurope -> West Europe, etc.
-- supports Markdown pipe tables for Resource Summary
-- does not show a misleading "N results" badge on Resource Summary
+Supported response types:
+- table
+- metric
 
-RUN
----
-Copy Apply-FrontendFormattingV3.ps1 to:
+If presentation is missing, the existing renderAssistantText() logic is
+still used as a fallback. This means the current UI remains backward compatible.
+
+FILES CHANGED
+-------------
+src\App.jsx
+src\styles.css
+
+The script creates backups before changing either file.
+
+STEP 1 - COPY SCRIPT
+--------------------
+Copy:
+
+Apply-StructuredFrontend.ps1
+
+to:
 
 C:\script\ai-operation-frontend
 
-Then:
+STEP 2 - RUN
+------------
+PowerShell:
 
 cd C:\script\ai-operation-frontend
 
-.\Apply-FrontendFormattingV3.ps1
+.\Apply-StructuredFrontend.ps1
 
-VERIFY
-------
-git diff -- src\App.jsx
+Expected:
 
-BUILD
------
+SUCCESS - Structured frontend response support applied.
+
+STEP 3 - REVIEW
+---------------
+git diff -- src\App.jsx src\styles.css
+
+STEP 4 - BUILD
+--------------
 npm run build
 
-If build succeeds:
+You want a successful Vite build.
 
-git add src\App.jsx
-git commit -m "Support all Azure inventory response formats"
+If the build fails, STOP and share the error.
+Do not push a failing build.
+
+STEP 5 - COMMIT
+---------------
+git add src\App.jsx src\styles.css
+
+git commit -m "Render structured Azure inventory responses"
+
 git push
 
-TEST
-----
-Show me storage accounts
-Show me resource summary
-Show me VM names
-Show me resource groups
+STEP 6 - WAIT FOR STATIC WEB APP DEPLOYMENT
+-------------------------------------------
+Wait for GitHub Actions / Azure Static Web Apps deployment to finish.
+
+Then open the app and press:
+
+Ctrl + F5
+
+STEP 7 - TEST
+-------------
+Test in this order:
+
+1. Show me storage accounts
+
+Expected:
+- title: Azure Storage Accounts
+- summary from backend
+- professional table
+- columns:
+  Name | Location | Subscription | Resource Group
+- count comes from backend presentation.total
+
+2. Show me resource summary
+
+Expected:
+- Resource Type | Count
+- total comes from backend sum of resourceCount
+
+3. How many virtual machines are there?
+
+Expected:
+- metric response
+- count comes from backend get_vm_count result
+
+4. Show me VM names
+
+5. Show me resource groups
+
+6. Show me subnets
+
+7. Show me subscription names
 
 IMPORTANT
 ---------
-The inventory result badge is the number of unique rows actually returned
-in that response. It does not trust or invent a number from assistant prose.
+Do NOT delete the old Markdown/plain-record parsers yet.
+They are retained as fallback for any response that does not include
+presentation.
+
+Once all structured responses are verified, we can remove the old
+formatting/parsing code in a later cleanup.
+
+ROLLBACK
+--------
+The script creates:
+
+src\App.jsx.before-structured-response.bak
+src\styles.css.before-structured-response.bak
+
+You can restore them manually if needed.

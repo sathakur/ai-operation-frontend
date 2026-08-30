@@ -801,104 +801,6 @@ const renderAssistantText = (text) => {
 
   return renderStandardAssistantText(lines);
 };
-const renderStructuredPresentation = (presentation) => {
-  if (!presentation) {
-    return null;
-  }
-
-  if (presentation.responseType === "metric") {
-    return (
-      <div className="structured-response">
-        {presentation.title && (
-          <div className="structured-response-title">
-            {presentation.title}
-          </div>
-        )}
-
-        <div className="structured-metric">
-          {presentation.total ?? 0}
-        </div>
-
-        {presentation.summary && (
-          <div className="structured-response-summary">
-            {presentation.summary}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (presentation.responseType === "table") {
-    const columns =
-      Array.isArray(presentation.columns)
-        ? presentation.columns
-        : [];
-
-    const rows =
-      Array.isArray(presentation.rows)
-        ? presentation.rows
-        : [];
-
-    return (
-      <div className="structured-response">
-        {presentation.title && (
-          <div className="structured-response-title">
-            {presentation.title}
-          </div>
-        )}
-
-        {presentation.summary && (
-          <div className="structured-response-summary">
-            {presentation.summary}
-          </div>
-        )}
-
-        <div className="assistant-table-toolbar">
-          <div className="assistant-table-count">
-            {presentation.total ?? rows.length}{" "}
-            {presentation.total === 1 ? "result" : "results"}
-          </div>
-        </div>
-
-        <div className="assistant-table-wrap">
-          <table className="assistant-table">
-            <thead>
-              <tr>
-                {columns.map((column) => (
-                  <th key={`structured-head-${column}`}>
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={`structured-row-${rowIndex}`}>
-                  {columns.map((column) => (
-                    <td
-                      key={`structured-${rowIndex}-${column}`}
-                      data-label={column}
-                    >
-                      <span
-                        className="assistant-table-cell-text"
-                        title={String(row?.[column] ?? "")}
-                      >
-                        {row?.[column] ?? "\u2014"}
-                      </span>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-};
 function App({ loginRequest, runtimeConfig }) {
   const { instance, accounts } = useMsal();
 
@@ -1084,8 +986,6 @@ function App({ loginRequest, runtimeConfig }) {
           text:
             body?.answer ||
             "The assistant returned no text response.",
-          presentation:
-            body?.presentation || null,
           meta: {
             correlationId:
               body?.correlationId || null,
@@ -1392,15 +1292,7 @@ function App({ loginRequest, runtimeConfig }) {
                         >
                           <div className="message-text">
                             {message.role === "assistant"
-                              ? (
-                                  message.presentation
-                                    ? renderStructuredPresentation(
-                                        message.presentation
-                                      )
-                                    : renderAssistantText(
-                                        message.text
-                                      )
-                                )
+                              ? renderAssistantText(message.text)
                               : message.text}
                           </div>
                         </div>
