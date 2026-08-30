@@ -6,38 +6,51 @@ import {
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+const nowLabel = () =>
+  new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date());
+
 const STARTER_MESSAGE = {
   id: "assistant-welcome",
   role: "assistant",
   text:
     "Hello! I’m your Azure Operations Assistant. I can help you explore subscriptions, virtual machines, storage accounts, resource groups, subnets, and other Azure inventory.",
-  meta: null
+  meta: null,
+  time: nowLabel()
 };
 
 const QUICK_PROMPTS = [
   {
     label: "Subscriptions",
-    prompt: "Show me subscription names"
+    prompt: "Show me subscription names",
+    icon: "▣"
   },
   {
     label: "VM count",
-    prompt: "How many virtual machines are there?"
+    prompt: "How many virtual machines are there?",
+    icon: "◫"
   },
   {
     label: "Virtual machines",
-    prompt: "Show me VM names"
+    prompt: "Show me VM names",
+    icon: "▤"
   },
   {
     label: "Storage accounts",
-    prompt: "Show me storage accounts"
+    prompt: "Show me storage accounts",
+    icon: "◧"
   },
   {
     label: "Resource groups",
-    prompt: "Show me resource groups"
+    prompt: "Show me resource groups",
+    icon: "▦"
   },
   {
     label: "Resource summary",
-    prompt: "Show me resource summary"
+    prompt: "Show me resource summary",
+    icon: "◩"
   }
 ];
 
@@ -133,10 +146,16 @@ function App({ loginRequest, runtimeConfig }) {
       .slice(2, 8)}`;
 
   const newChat = () => {
-    setMessages([STARTER_MESSAGE]);
+    setMessages([{ ...STARTER_MESSAGE, time: nowLabel() }]);
     setChatMessage("");
     setTechnicalMessageId(null);
     setSidebarOpen(false);
+  };
+
+  const clearConversation = () => {
+    setMessages([]);
+    setChatMessage("");
+    setTechnicalMessageId(null);
   };
 
   const sendChatMessage = async (
@@ -154,7 +173,8 @@ function App({ loginRequest, runtimeConfig }) {
       id: createId("user"),
       role: "user",
       text: message,
-      meta: null
+      meta: null,
+      time: nowLabel()
     };
 
     setMessages((current) => [
@@ -226,7 +246,8 @@ function App({ loginRequest, runtimeConfig }) {
               body?.agentName || null,
             agentVersion:
               body?.agentVersion || null
-          }
+          },
+          time: nowLabel()
         }
       ]);
     } catch (error) {
@@ -244,7 +265,8 @@ function App({ loginRequest, runtimeConfig }) {
             error:
               error?.message ||
               "Azure Operations Assistant request failed."
-          }
+          },
+          time: nowLabel()
         }
       ]);
     } finally {
@@ -360,8 +382,12 @@ function App({ loginRequest, runtimeConfig }) {
                 Connected
               </div>
 
-              <div className="mode-pill">
+              <div
+                className="mode-pill"
+                title="Read-only mode can retrieve Azure inventory but cannot modify Azure resources."
+              >
                 Read only
+                <span className="info-dot">i</span>
               </div>
 
               <div className="user-menu">
@@ -420,7 +446,7 @@ function App({ loginRequest, runtimeConfig }) {
                       disabled={chatLoading}
                     >
                       <span className="quick-prompt-icon">
-                        ◇
+                        {item.icon}
                       </span>
                       {item.label}
                     </button>
@@ -463,9 +489,19 @@ function App({ loginRequest, runtimeConfig }) {
                   </p>
                 </div>
 
-                <div className="chat-header-status">
-                  <span className="status-dot" />
-                  Inventory service connected
+                <div className="chat-header-actions">
+                  <div className="chat-header-status">
+                    <span className="status-dot" />
+                    Inventory service connected
+                  </div>
+
+                  <button
+                    className="clear-button"
+                    onClick={clearConversation}
+                    disabled={messages.length === 0 || chatLoading}
+                  >
+                    Clear conversation
+                  </button>
                 </div>
               </section>
 
@@ -487,10 +523,15 @@ function App({ loginRequest, runtimeConfig }) {
                       </div>
 
                       <div className="message-content">
-                        <div className="message-heading">
-                          {message.role === "assistant"
-                            ? "Azure Operations Assistant"
-                            : "You"}
+                        <div className="message-heading-row">
+                          <div className="message-heading">
+                            {message.role === "assistant"
+                              ? "Azure Operations Assistant"
+                              : "You"}
+                          </div>
+                          <div className="message-time">
+                            {message.time || ""}
+                          </div>
                         </div>
 
                         <div
@@ -604,8 +645,13 @@ function App({ loginRequest, runtimeConfig }) {
                       </div>
 
                       <div className="message-content">
-                        <div className="message-heading">
-                          Azure Operations Assistant
+                        <div className="message-heading-row">
+                          <div className="message-heading">
+                            Azure Operations Assistant
+                          </div>
+                          <div className="message-time">
+                            {nowLabel()}
+                          </div>
                         </div>
 
                         <div className="thinking-card">
@@ -615,6 +661,12 @@ function App({ loginRequest, runtimeConfig }) {
                             <span />
                           </div>
                           Checking Azure inventory…
+                        </div>
+
+                        <div className="skeleton-stack">
+                          <span />
+                          <span />
+                          <span />
                         </div>
                       </div>
                     </div>
